@@ -1,4 +1,3 @@
-# .github/workflows/deploy-lemobici-api.yml
 name: Deploy Lemobici API
 
 on:
@@ -14,6 +13,11 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
+      # Optionnel : préparer une archive propre
+      - name: Prepare deployment archive
+        run: |
+          tar czf deploy.tar.gz --exclude='.git' --exclude='.github' --exclude='.gitignore' .
+
       - name: Transfer to VPS
         uses: appleboy/scp-action@v0.1.7
         with:
@@ -21,10 +25,8 @@ jobs:
           username: ${{ secrets.VPS_USER }}
           key: ${{ secrets.SSH_PRIVATE_KEY }}
           port: ${{ secrets.VPS_SSH_PORT }}
-          source: "."
-          target: "/opt/lemobici/lemobici-api-temp"
-          overwrite: true
-          tar_args: "--exclude='.git*'"
+          source: "deploy.tar.gz"
+          target: "/opt/lemobici/tmp"
 
       - name: Deploy with zero downtime
         uses: appleboy/ssh-action@v1.0.3
@@ -34,8 +36,30 @@ jobs:
           key: ${{ secrets.SSH_PRIVATE_KEY }}
           port: ${{ secrets.VPS_SSH_PORT }}
           script: |
+            set -e  # Arrêt sur erreur
+            
             cd /opt/lemobici
-
-            docker compose up --build api 
-
-            echo "Deployment API finished ---1⚔️---"
+            
+            # Backup de l'ancienne version (rollback possible)
+            if [ -d "lemobici-api" ]; then
+              mv lemobici-api lemobici-api.backup.$(date +%s)
+            fi
+            
+            # Extraction dans un dossier temporaire
+            mkdir -p lemobici-api-new
+            tar xzf tmp/deploy.tar.gz -C lemobici-api-new
+            
+            # Swap atomique
+            mv lemobici-api-new lemobici-api
+            
+            # Cleanup
+            rm -f tmp/deploy.tar.gz
+            
+            # Docker deploy
+            docker compose up -d --build api
+            
+            # Health check basique
+            sleep 5
+            docker compose ps api
+            
+            echo "Deployment API finished ••• 1 ⚔️ ••• ✅"
