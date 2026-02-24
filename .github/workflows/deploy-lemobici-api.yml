@@ -24,6 +24,7 @@ jobs:
           source: "."
           target: "/opt/lemobici/lemobici-api-temp"
           overwrite: true
+          tar_args: "--exclude='.git*'"
 
       - name: Deploy with zero downtime
         uses: appleboy/ssh-action@v1.0.3
@@ -34,73 +35,7 @@ jobs:
           port: ${{ secrets.VPS_SSH_PORT }}
           script: |
             cd /opt/lemobici
-            
-            # Déterminer couleur inactive
-            if docker ps --format '{{.Names}}' | grep -q "^lemobici-api-blue$"; then
-              NEW="green"
-              OLD="blue"
-              PORT="3001"
-            else
-              NEW="blue"
-              OLD="green"
-              PORT="3000"
-            fi
-            
-            echo "Deploying to $NEW on port $PORT"
-            
-            # Préparer le nouveau dossier
-            rm -rf lemobici-api-$NEW
-            cp -r lemobici-api-temp lemobici-api-$NEW
-            
-            # Build et démarrer
-            cd lemobici-api-$NEW
-            docker build --target production -t lemobici-api:$NEW .
-            
-            # Démarrer avec healthcheck intégré
-            docker run -d \
-              --name lemobici-api-$NEW \
-              --network lemobici-network \
-              -p $PORT:3000 \
-              --env-file /opt/lemobici/.env \
-              --restart unless-stopped \
-              lemobici-api:$NEW
-            
-            # Attendre healthcheck (max 60s)
-            HEALTHY=0
-            for i in {1..12}; do
-              sleep 5
-              STATUS=$(docker inspect --format='{{.State.Health.Status}}' lemobici-api-$NEW 2>/dev/null || echo "starting")
-              if [ "$STATUS" = "healthy" ]; then
-                echo "Container healthy"
-                HEALTHY=1
-                break
-              fi
-              echo "Waiting for healthcheck... ($STATUS)"
-            done
-            
-            if [ $HEALTHY -eq 0 ]; then
-              echo "HEALTHCHECK FAILED - ROLLING BACK"
-              docker stop lemobici-api-$NEW
-              docker rm lemobici-api-$NEW
-              docker rmi lemobici-api:$NEW
-              rm -rf lemobici-api-$NEW
-              rm -rf lemobici-api-temp
-              exit 1
-            fi
-            
-            # Mettre à jour nginx upstream
-            sed -i "s/server localhost:300. backup/server localhost:$PORT backup/" nginx/default.conf
-            
-            # Reload nginx (pas de downtime)
-            docker exec lemobici-nginx nginx -s reload
-            
-            # Arrêter l'ancienne version
-            docker stop lemobici-api-$OLD 2>/dev/null || true
-            docker rm lemobici-api-$OLD 2>/dev/null || true
-            docker rmi lemobici-api:$OLD 2>/dev/null || true
-            
-            # Nettoyage
-            rm -rf lemobici-api-temp
-            docker system prune -f
-            
-            echo "Deployment successful on $NEW"
+
+            docker compose up --build api 
+
+            echo "Deployment API finished ---1⚔️---"
