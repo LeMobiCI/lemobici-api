@@ -16,7 +16,12 @@ jobs:
       # Optionnel : préparer une archive propre
       - name: Prepare deployment archive
         run: |
-          tar czf deploy.tar.gz --exclude='.git' --exclude='.github' --exclude='.gitignore' .
+          tar czf /tmp/deploy.tar.gz \
+            --exclude='.git' \
+            --exclude='.github' \
+            --exclude='.gitignore' \
+            --exclude='node_modules' \
+            .
 
       - name: Transfer to VPS
         uses: appleboy/scp-action@v0.1.7
