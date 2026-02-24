@@ -49,25 +49,25 @@ jobs:
             
             cd /opt/lemobici
             
-            # Backup de l'ancienne version (rollback possible)
+            # Arrêter le conteneur api existant
+            docker stop lemobici-api-container 2>/dev/null || true
+            docker rm -f lemobici-api-container 2>/dev/null || true
+            
+            # Backup du code
             if [ -d "lemobici-api" ]; then
               mv lemobici-api lemobici-api.backup.$(date +%s)
             fi
             
-            # Extraction dans un dossier temporaire
-            mkdir -p lemobici-api-new
-            tar xzf tmp/deploy.tar.gz -C lemobici-api-new
-            
-            # Swap atomique
-            mv lemobici-api-new lemobici-api
-            
-            # Cleanup
+            # Extraction
+            mkdir -p lemobici-api
+            tar xzf tmp/deploy.tar.gz -C lemobici-api
             rm -f tmp/deploy.tar.gz
             
-            # Docker deploy
-            docker compose -f docker-compose-dev.yml --env-file .env.dev up -d --build api
+            # Build et démarrage
+            docker compose -f docker-compose-dev.yml --env-file .env.dev build api
+            docker compose -f docker-compose-dev.yml --env-file .env.dev up -d api
             
-            # Health check basique
+            # Health check
             sleep 5
             docker compose ps api
             
