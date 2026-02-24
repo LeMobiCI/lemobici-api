@@ -65,7 +65,7 @@ jobs:
             rm -f tmp/deploy.tar.gz
             
             # Docker deploy
-            docker compose up -d --build api
+            docker compose -f docker-compose-dev.yml --env-file .env.dev up -d --build api
             
             # Health check basique
             sleep 5
