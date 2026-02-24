@@ -69,6 +69,6 @@ jobs:
             
             # Health check
             sleep 5
-            docker compose ps api
+            docker ps --filter "name=lemobici-api-container" --format "table {{.Names}}\t{{.Status}}"
             
             echo "Deployment API finished ••• 1 ⚔️ ••• ✅"
