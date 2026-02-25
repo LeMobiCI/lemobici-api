@@ -5,9 +5,10 @@ FROM node:24-alpine
 WORKDIR /lemobici-api
 
 # Copie des fichiers de configuration des dépendances
+COPY .npmrc ./
 COPY package*.json ./
 
-# Installation de toutes les dépendances (incluant devDependencies)
+# Installation de toutes les dépendances du projet
 RUN npm install
 
 # Copie du reste du code source
