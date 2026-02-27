@@ -4,6 +4,7 @@ import { AppController } from './app.controller';
 import { AppService } from './app.service';
 import databaseConfig from './config/database.config';
 import { TypeOrmModule, TypeOrmModuleOptions } from '@nestjs/typeorm';
+import { AuthModule } from './modules/auth/auth.module';
 
 @Module({
 
@@ -20,7 +21,8 @@ import { TypeOrmModule, TypeOrmModuleOptions } from '@nestjs/typeorm';
       inject : [ConfigService],
       useFactory : (config : ConfigService) : TypeOrmModuleOptions =>
         config.get<TypeOrmModuleOptions>('database')!,
-    })
+    }),
+    AuthModule,
   ],
 
   controllers: [AppController],
