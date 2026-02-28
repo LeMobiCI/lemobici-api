@@ -25,10 +25,20 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
     private readonly userRepository: Repository<User>,
     private readonly configService: ConfigService,
   ) {
+    // Lire JWT_SECRET directement (pas via namespace 'jwt.secret')
+    // car registerAs('jwt') n'est pas garanti d'être résolu avant super()
+    const secret = configService.get<string>('JWT_SECRET');
+
+    if (!secret) {
+      throw new Error(
+        'JWT_SECRET est manquant dans les variables d\'environnement',
+      );
+    }
+
     super({
       jwtFromRequest:   ExtractJwt.fromAuthHeaderAsBearerToken(),
       ignoreExpiration: false,
-      secretOrKey:      configService.get<string>('jwt.secret')!,
+      secretOrKey:      secret,
     });
   }
 
