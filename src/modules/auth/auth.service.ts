@@ -4,7 +4,6 @@ import {
   UnauthorizedException,
 } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
-import { ConfigService } from '@nestjs/config';
 import { InjectRepository } from '@nestjs/typeorm';
 import * as bcrypt from 'bcrypt';
 import { Repository } from 'typeorm';
@@ -25,10 +24,9 @@ export class AuthService {
     @InjectRepository(User)
     private readonly userRepository: Repository<User>,
     private readonly jwtService:     JwtService,
-    private readonly configService:  ConfigService,
   ) {}
 
-  // ── register ───────────────────────────────────────────────────────────────
+  // ───────── register ──────────
 
   async register(dto: RegisterDto): Promise<IAuthResponse> {
     const existing = await this.userRepository.findOne({
@@ -46,7 +44,7 @@ export class AuthService {
     return this.buildResponse(saved);
   }
 
-  // ── login ──────────────────────────────────────────────────────────────────
+  // ───────── login ──────────
 
   async login(dto: LoginDto): Promise<IAuthResponse> {
     // addSelect obligatoire : password a select:false sur l'entité
@@ -72,7 +70,7 @@ export class AuthService {
     return this.buildResponse(user);
   }
 
-  // ── logout ─────────────────────────────────────────────────────────────────
+  // ───────── logout ──────────
 
   async logout(_userId: string): Promise<ILogoutResponse> {
     // JWT stateless : la suppression du token est gérée côté client.
@@ -80,7 +78,7 @@ export class AuthService {
     return { message: 'Déconnexion réussie' };
   }
 
-  // ── validateUser (utilisé par LocalStrategy si ajouté) ────────────────────
+  // ───────── validateUser (utilisé par LocalStrategy si ajouté) ──────────
 
   async validateUser(
     email: string,
@@ -101,7 +99,7 @@ export class AuthService {
     return userWithoutPassword;
   }
 
-  // ── helpers ────────────────────────────────────────────────────────────────
+  // ───────── Helpers ──────────
 
   private buildResponse(user: User): IAuthResponse {
     // Le JwtModule est déjà configuré avec secret + expiresIn via registerAsync.
