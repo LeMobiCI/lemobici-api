@@ -10,8 +10,13 @@ import { AuthService } from '../auth.service';
 import { RegisterDto } from '../dto/register.dto';
 import { LoginDto } from '../dto/login.dto';
 import { User } from '../entities/user.entity';
+import { MailService } from '../../mail/mail.service';
 
 // ───────── Factories ──────────
+
+const mockMailService = { 
+  sendResetPassword: jest.fn().mockResolvedValue(undefined)
+};
 
 jest.mock('bcrypt', () => ({
   hash: jest.fn(),
@@ -49,14 +54,14 @@ const makeLoginDto = (o: Partial<LoginDto> = {}): LoginDto => ({
 
 const makeQB = (result: User | null) => ({
   addSelect: jest.fn().mockReturnThis(),
-  where:     jest.fn().mockReturnThis(),
-  getOne:    jest.fn().mockResolvedValue(result),
+  where: jest.fn().mockReturnThis(),
+  getOne: jest.fn().mockResolvedValue(result),
 });
 
 const mockRepo = () => ({
-  findOne:            jest.fn(),
-  create:             jest.fn(),
-  save:               jest.fn(),
+  findOne: jest.fn(),
+  create: jest.fn(),
+  save: jest.fn(),
   createQueryBuilder: jest.fn(),
 });
 
@@ -74,6 +79,7 @@ describe('AuthService', () => {
         { provide: getRepositoryToken(User), useValue: mockRepo() },
         { provide: JwtService, useValue: { sign: jest.fn().mockReturnValue('mock.token') } },
         { provide: ConfigService, useValue: { get: jest.fn().mockReturnValue('test_secret') } },
+        { provide: MailService, useValue: mockMailService },
       ],
     }).compile();
 
@@ -167,25 +173,4 @@ describe('AuthService', () => {
     });
   });
 
-  // ── validateUser ──────────────────────────────────────────────────────────
-
-  describe('validateUser()', () => {
-    it("devrait retourner l'utilisateur sans password si valide", async () => {
-      repo.createQueryBuilder.mockReturnValue(makeQB(makeUser()));
-      jest.spyOn(bcrypt, 'compare').mockResolvedValue(true as never);
-      const result = await service.validateUser('kouame@lemobici.ci', 'pass');
-      expect(result).not.toHaveProperty('password');
-    });
-
-    it("devrait retourner null si l'utilisateur est introuvable", async () => {
-      repo.createQueryBuilder.mockReturnValue(makeQB(null));
-      expect(await service.validateUser('ghost@ci', 'pass')).toBeNull();
-    });
-
-    it('devrait retourner null si mot de passe incorrect', async () => {
-      repo.createQueryBuilder.mockReturnValue(makeQB(makeUser()));
-      jest.spyOn(bcrypt, 'compare').mockResolvedValue(false as never);
-      expect(await service.validateUser('kouame@lemobici.ci', 'bad')).toBeNull();
-    });
-  });
 });

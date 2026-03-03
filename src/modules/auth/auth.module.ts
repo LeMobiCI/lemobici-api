@@ -11,6 +11,7 @@ import { User }           from './entities/user.entity';
 import { JwtAuthGuard }   from './guards/jwt-auth.guard';
 import { RolesGuard }     from './guards/roles.guard';
 import { JwtStrategy }    from './strategies/jwt.strategy';
+import { MailModule } from '../mail/mail.module';
 
 @Module({
   imports: [
@@ -26,6 +27,7 @@ import { JwtStrategy }    from './strategies/jwt.strategy';
         signOptions: { expiresIn: (config.get<string>('jwt.signOptions.expiresIn')) as StringValue ?? '7d' },
       }),
     }),
+    MailModule,
   ],
   controllers: [AuthController],
   providers:   [AuthService, JwtStrategy, JwtAuthGuard, RolesGuard],

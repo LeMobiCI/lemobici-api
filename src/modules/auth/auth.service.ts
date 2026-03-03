@@ -1,4 +1,5 @@
 import {
+  BadRequestException,
   ConflictException,
   Injectable,
   UnauthorizedException,
@@ -6,6 +7,7 @@ import {
 import { JwtService } from '@nestjs/jwt';
 import { InjectRepository } from '@nestjs/typeorm';
 import * as bcrypt from 'bcrypt';
+import * as crypto from 'crypto';
 import { Repository } from 'typeorm';
 
 import {
@@ -17,13 +19,19 @@ import {
 import { RegisterDto } from './dto/register.dto';
 import { LoginDto }    from './dto/login.dto';
 import { User }        from './entities/user.entity';
+import { ForgotPasswordDto } from './dto/forgot-passord.dto';
+import { ResetPasswordDto } from './dto/reset-passord.dto';
+import { ConfigService } from '@nestjs/config';
+import { MailService } from '../mail/mail.service';
 
 @Injectable()
 export class AuthService {
   constructor(
     @InjectRepository(User)
     private readonly userRepository: Repository<User>,
-    private readonly jwtService:     JwtService,
+    private readonly jwtService: JwtService,
+    private readonly configService: ConfigService,
+    private readonly mailService: MailService
   ) {}
 
   // ───────── register ──────────
@@ -78,25 +86,86 @@ export class AuthService {
     return { message: 'Déconnexion réussie' };
   }
 
-  // ───────── validateUser (utilisé par LocalStrategy si ajouté) ──────────
+  // ───────── forgotPassword ──────────
 
-  async validateUser(
-    email: string,
-    password: string,
-  ): Promise<Omit<User, 'password'> | null> {
+  async forgotPassword(dto: ForgotPasswordDto): Promise<{ message: string }> {
+    const user = await this.userRepository.findOne({
+      where: { email: dto.email },
+    });
+
+    // Réponse identique que l'email existe ou non
+    // → empêche l'énumération d'emails (user enumeration attack)
+    const genericMessage = {
+      message:
+        'Si un compte existe avec cet email, vous recevrez un lien de réinitialisation.',
+    };
+
+    if (!user || !user.isActive) {
+      return genericMessage;
+    }
+
+    // Générer un token aléatoire cryptographiquement sûr (32 bytes → 64 chars hex)
+    const rawToken = crypto.randomBytes(32).toString('hex');
+
+    // Stocker le hash en DB (jamais le token brut)
+    // → si la DB est compromise, les tokens ne peuvent pas être utilisés
+    const hashedToken = crypto
+      .createHash('sha256')
+      .update(rawToken)
+      .digest('hex');
+
+    const expiryMinutes =
+      this.configService.get<number>('mail.resetPasswordExpiryMinutes') ?? 60;
+
+    user.resetPasswordToken  = hashedToken;
+    user.resetPasswordExpiry = new Date(Date.now() + expiryMinutes * 60 * 1000);
+    await this.userRepository.save(user);
+
+    // Envoyer l'email avec le token BRUT (pas le hash)
+    await this.mailService.sendResetPassword({
+      to:         user.email,
+      firstName:  user.firstName,
+      resetToken: rawToken,
+    });
+
+    return genericMessage;
+  }
+
+  // ───────── resetPassword ──────────
+  async resetPassword(dto: ResetPasswordDto): Promise<{ message: string }> {
+    // Hasher le token reçu pour comparer avec celui en DB
+    const hashedToken = crypto
+      .createHash('sha256')
+      .update(dto.token)
+      .digest('hex');
+
     const user = await this.userRepository
       .createQueryBuilder('user')
-      .addSelect('user.password')
-      .where('user.email = :email', { email })
+      .addSelect('user.resetPasswordToken')
+      .addSelect('user.resetPasswordExpiry')
+      .where('user.resetPasswordToken = :token', { token: hashedToken })
       .getOne();
 
-    if (!user) return null;
+    if (!user) {
+      throw new BadRequestException('Token invalide ou expiré');
+    }
 
-    const isValid = await bcrypt.compare(password, user.password);
-    if (!isValid) return null;
+    // Vérifier l'expiration
+    if (!user.resetPasswordExpiry || user.resetPasswordExpiry < new Date()) {
+      // Nettoyer le token expiré
+      user.resetPasswordToken = null as any;
+      user.resetPasswordExpiry = null as any;
+      await this.userRepository.save(user);
+      throw new BadRequestException('Token invalide ou expiré');
+    }
 
-    const { password: _pwd, ...userWithoutPassword } = user;
-    return userWithoutPassword;
+    // Mettre à jour le mot de passe
+    user.password = await bcrypt.hash(dto.newPassword, BCRYPT_SALT_ROUNDS);
+    user.resetPasswordToken  = null as any;   // invalider le token après usage
+    user.resetPasswordExpiry = null as any;
+    await this.userRepository.save(user);
+
+    return { message: 'Mot de passe réinitialisé avec succès' };
   }
 
   // ───────── Helpers ──────────

@@ -8,30 +8,91 @@ import { AuthService }    from './auth.service';
 import { JwtAuthGuard }   from './guards/jwt-auth.guard';
 import { CurrentUser }    from './decorators/current-user.decorator';
 import { User }           from './entities/user.entity';
+import { ForgotPasswordDto } from './dto/forgot-passord.dto';
+import { ResetPasswordDto } from './dto/reset-passord.dto';
 
 @Controller('auth')
 export class AuthController {
   constructor(private readonly authService: AuthService) {}
 
-  /** POST /api/v1/auth/register */
+  /** 
+   * Inscrire un nouvel utilisateur
+   * POST /api/v1/auth/register 
+   * 
+   * @param registerDto
+   * @returns : les infos du user créé + token JWT
+   * 
+   * Note : Cette route n'a pas besoin de token JWT pour être accessible.
+   * */
   @Post('register')
   @HttpCode(HttpStatus.CREATED)
-  register(@Body() dto: RegisterDto) {
-    return this.authService.register(dto);
+  register(@Body() registerDto: RegisterDto) {
+    return this.authService.register(registerDto);
   }
 
-  /** POST /api/v1/auth/login */
+  /** 
+   * Authentifier un utilisateur existant et lui fournir un JWT
+   * POST /api/v1/auth/login 
+   * 
+   * @param loginDto
+   * @returns : les infos du user créé + token JWT
+   * 
+   * Note : Cette route n'a pas besoin de token JWT pour être accessible.
+   * */
   @Post('login')
   @HttpCode(HttpStatus.OK)
-  login(@Body() dto: LoginDto) {
-    return this.authService.login(dto);
+  login(@Body() loginDto: LoginDto) {
+    return this.authService.login(loginDto);
   }
 
-  /** POST /api/v1/auth/logout */
+  /** 
+   * Déconnecter le user en invalidant son token JWT côté serveur 
+   * ex: via une blacklist Redis ou en changeant un champ "tokenVersion" dans la BD 
+   * POST /api/v1/auth/logout 
+   * 
+   * @param user : Le user connecté (injecté via le décorateur @CurrentUser())
+   * @return : Un message de succès ou une erreur si la déconnexion échoue
+   * 
+   * Note : Cette route doit être protégée par le JwtAuthGuard pour s'assurer que seul un utilisateur authentifié peut y accéder
+   * */
   @Post('logout')
   @UseGuards(JwtAuthGuard)
   @HttpCode(HttpStatus.OK)
   logout(@CurrentUser() user: User) {
     return this.authService.logout(user.id);
+  }
+
+  /** 
+   * Génère et envoie le token de réinitialisation du password
+   * POST /api/v1/auth/forgot-password
+   * 
+   * @param newPassword : Le nouveau mdp de l'utilisateur
+   * @param user : Le user connecté (injecté via le décorateur @CurrentUser())
+   * @return : Un message de succès ou une erreur si le mdp ne respecte pas les règles de validation
+   * 
+   * Note : Cette route doit être protégée par le JwtAuthGuard pour s'assurer que seul un utilisateur authentifié peut y accéder
+   * */
+  @Post('forgot-password')
+  @UseGuards(JwtAuthGuard)
+  @HttpCode(HttpStatus.OK)
+  forgotPassword(@Body() forgotPasswordDto: ForgotPasswordDto) {
+    return this.authService.forgotPassword(forgotPasswordDto);
+  }
+
+  /** 
+   * Valide le token et change le password
+   * POST /api/v1/auth/reset-password
+   * 
+   * @param newPassword : Le nouveau mdp de l'utilisateur
+   * @param user : Le user connecté (injecté via le décorateur @CurrentUser())
+   * @return : Un message de succès ou une erreur si le mdp ne respecte pas les règles de validation
+   * 
+   * Note : Cette route doit être protégée par le JwtAuthGuard pour s'assurer que seul un utilisateur authentifié peut y accéder
+   * */
+  @Post('reset-password')
+  @UseGuards(JwtAuthGuard)
+  @HttpCode(HttpStatus.OK)
+  resetPassword(@Body() resetPasswordDto: ResetPasswordDto) {
+    return this.authService.resetPassword(resetPasswordDto);
   }
 }

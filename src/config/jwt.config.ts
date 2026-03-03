@@ -9,7 +9,7 @@ import { StringValue } from 'ms';
 export default registerAs(
   'jwt',
   (): JwtModuleOptions => ({
-    secret:       process.env.JWT_SECRET     ?? 'lemobici_dev_secret_change_in_prod',
+    secret: process.env.JWT_SECRET ?? 'lemobici_dev_secret_change_in_prod',
     signOptions: {
       expiresIn: (process.env.JWT_EXPIRES_IN as StringValue) ?? '7d',
     },

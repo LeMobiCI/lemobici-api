@@ -38,4 +38,10 @@ export class User {
 
   @UpdateDateColumn()
   updatedAt: Date;
+
+  @Column({ nullable: true, select: false })
+  resetPasswordToken: string; 
+
+  @Column({ nullable: true })
+  resetPasswordExpiry: Date;
 }
