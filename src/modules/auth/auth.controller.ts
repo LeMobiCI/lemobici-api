@@ -66,14 +66,10 @@ export class AuthController {
    * Génère et envoie le token de réinitialisation du password
    * POST /api/v1/auth/forgot-password
    * 
-   * @param newPassword : Le nouveau mdp de l'utilisateur
-   * @param user : Le user connecté (injecté via le décorateur @CurrentUser())
+   * @param forgotPasswordDto : L'email de l'utilisateur qui a oublié son mot de passe
    * @return : Un message de succès ou une erreur si le mdp ne respecte pas les règles de validation
-   * 
-   * Note : Cette route doit être protégée par le JwtAuthGuard pour s'assurer que seul un utilisateur authentifié peut y accéder
    * */
   @Post('forgot-password')
-  @UseGuards(JwtAuthGuard)
   @HttpCode(HttpStatus.OK)
   forgotPassword(@Body() forgotPasswordDto: ForgotPasswordDto) {
     return this.authService.forgotPassword(forgotPasswordDto);
@@ -83,14 +79,10 @@ export class AuthController {
    * Valide le token et change le password
    * POST /api/v1/auth/reset-password
    * 
-   * @param newPassword : Le nouveau mdp de l'utilisateur
-   * @param user : Le user connecté (injecté via le décorateur @CurrentUser())
+   * @param resetPasswordDto : Le token de réinitialisation et le nouveau mot de passe
    * @return : Un message de succès ou une erreur si le mdp ne respecte pas les règles de validation
-   * 
-   * Note : Cette route doit être protégée par le JwtAuthGuard pour s'assurer que seul un utilisateur authentifié peut y accéder
    * */
   @Post('reset-password')
-  @UseGuards(JwtAuthGuard)
   @HttpCode(HttpStatus.OK)
   resetPassword(@Body() resetPasswordDto: ResetPasswordDto) {
     return this.authService.resetPassword(resetPasswordDto);
