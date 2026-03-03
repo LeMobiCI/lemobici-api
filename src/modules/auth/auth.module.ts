@@ -1,6 +1,6 @@
 import { Module }                      from '@nestjs/common';
 import { ConfigModule, ConfigService } from '@nestjs/config';
-import { JwtModule }      from '@nestjs/jwt';
+import { JwtModule, JwtModuleOptions }      from '@nestjs/jwt';
 import { PassportModule } from '@nestjs/passport';
 import { TypeOrmModule }  from '@nestjs/typeorm';
 import { StringValue }    from 'ms';
@@ -20,12 +20,21 @@ import { MailModule } from '../mail/mail.module';
 
     // JwtModule async : lit le secret depuis ConfigService
     JwtModule.registerAsync({
-      imports:    [ConfigModule],
-      inject:     [ConfigService],
-      useFactory: (config: ConfigService) => ({
-        secret:      config.get<string>('jwt.secret'),
-        signOptions: { expiresIn: (config.get<string>('jwt.signOptions.expiresIn')) as StringValue ?? '7d' },
-      }),
+      imports: [ConfigModule],
+      inject: [ConfigService],
+      useFactory: async (config: ConfigService) : Promise<JwtModuleOptions>  => {
+        const secret = config.get<string>('JWT_SECRET');
+        if (!secret) {
+          throw new Error('JWT_SECRET est manquant dans les variables d\'environnement');
+        }
+        const expiresIn = config.get<string>('JWT_EXPIRES_IN') ?? '7d';
+        return {
+          secret,
+          signOptions: {
+            expiresIn: Number(expiresIn),
+          },
+        };
+      },
     }),
     MailModule,
   ],
