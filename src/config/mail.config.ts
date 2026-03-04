@@ -8,7 +8,7 @@ export default registerAs('mail', () => ({
   password: process.env.MAIL_PASSWORD ?? '',
   from: {
     name: process.env.MAIL_FROM_NAME ?? 'LeMobici',
-    address: process.env.MAIL_FROM_ADDRESS ?? 'noreply@lemobici.ci',
+    address: process.env.MAIL_FROM_ADDRESS ?? 'noreply@skillou.com',
   },
   resetPasswordExpiryMinutes: parseInt(
     process.env.RESET_PASSWORD_EXPIRY_MINUTES ?? '60',

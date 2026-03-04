@@ -1,10 +1,11 @@
+import { IResetPasswordPayload } from "@lemobici/lemobici-shared";
 import { 
   IsString,
   Matches, 
   MinLength 
 } from "class-validator";
 
-export class ResetPasswordDto {//implements IResetPasswordPayload
+export class ResetPasswordDto implements IResetPasswordPayload {
   @IsString({ message: 'Le token est requis' })
   token: string;
 

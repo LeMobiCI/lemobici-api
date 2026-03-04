@@ -29,7 +29,7 @@ const expectJwtSignedWithUser = (
 ) => {
   expect(jwt.sign).toHaveBeenCalledWith(
     expect.objectContaining({
-      sub: user.id,
+      id: user.id,
       email: user.email,
       role: user.role,
     }),
@@ -122,7 +122,7 @@ describe('AuthService', () => {
       expect(spy).toHaveBeenCalledWith('Secret123!', 10);
     });
 
-    it('devrait signer le JWT avec sub, email et role', async () => {
+    it('devrait signer le JWT avec id, email et role', async () => {
       const user = makeUser();
       repo.findOne.mockResolvedValue(null);
       repo.create.mockReturnValue(user);

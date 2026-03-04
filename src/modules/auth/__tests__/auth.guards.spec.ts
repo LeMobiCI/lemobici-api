@@ -41,7 +41,7 @@ describe('JwtAuthGuard', () => {
   afterEach(() => jest.clearAllMocks());
 
   it('devrait autoriser un token valide et attacher le payload à request.user', () => {
-    const payload = { sub: 'uuid-1234', email: 'k@lemobici.ci', role: UserRole.TENANT };
+    const payload = { id: 'uuid-1234', email: 'k@lemobici.ci', role: UserRole.TENANT };
     jwt.verify.mockReturnValue(payload);
     const ctx = makeCtx({ headers: { authorization: 'Bearer valid.token' } });
     expect(guard.canActivate(ctx)).toBe(true);

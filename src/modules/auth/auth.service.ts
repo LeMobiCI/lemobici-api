@@ -2,6 +2,7 @@ import {
   BadRequestException,
   ConflictException,
   Injectable,
+  NotFoundException,
   UnauthorizedException,
 } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
@@ -12,7 +13,7 @@ import { Repository } from 'typeorm';
 
 import {
   IAuthResponse,
-  ILogoutResponse,
+  IMessageResponse,
   BCRYPT_SALT_ROUNDS,
 } from '@lemobici/lemobici-shared';
 
@@ -23,6 +24,7 @@ import { ForgotPasswordDto } from './dto/forgot-passord.dto';
 import { ResetPasswordDto } from './dto/reset-passord.dto';
 import { ConfigService } from '@nestjs/config';
 import { MailService } from '../mail/mail.service';
+import { UpdatePasswordDto } from './dto/update-password.dto';
 
 @Injectable()
 export class AuthService {
@@ -80,10 +82,31 @@ export class AuthService {
 
   // ───────── logout ──────────
 
-  async logout(_userId: string): Promise<ILogoutResponse> {
+  async logout(_userId: string): Promise<IMessageResponse> {
     // JWT stateless : la suppression du token est gérée côté client.
     // Pour une révocation serveur → implémenter une blacklist Redis.
     return { message: 'Déconnexion réussie' };
+  }
+
+  // ───────── updatePassword ──────────
+
+  async updatePassword(userId: string, dto: UpdatePasswordDto): Promise<IMessageResponse> {
+    const user = await this.userRepository
+      .createQueryBuilder('user')
+      .addSelect('user.password')
+      .where('user.id = :id', { id: userId })
+      .getOne();
+
+    if (!user) throw new NotFoundException('Utilisateur introuvable');
+
+    const isValid = await bcrypt.compare(dto.currentPassword, user.password);
+    if (!isValid) throw new BadRequestException('Mot de passe actuel incorrect');
+
+    // confirmPassword déjà validé par le DTO — inutile de le revérifier ici
+    user.password = await bcrypt.hash(dto.newPassword, BCRYPT_SALT_ROUNDS);
+    await this.userRepository.save(user);
+
+    return { message: 'Mot de passe mis à jour avec succès' };
   }
 
   // ───────── forgotPassword ──────────
@@ -174,7 +197,7 @@ export class AuthService {
     // Le JwtModule est déjà configuré avec secret + expiresIn via registerAsync.
     // On appelle sign() SANS options → il utilise la config du module directement.
     const accessToken = this.jwtService.sign({ 
-      sub: user.id, 
+      id: user.id, 
       email: user.email, 
       role: user.role 
     });
