@@ -29,7 +29,7 @@ const expectJwtSignedWithUser = (
 ) => {
   expect(jwt.sign).toHaveBeenCalledWith(
     expect.objectContaining({
-      id: user.id,
+      sub: user.id,
       email: user.email,
       role: user.role,
     }),

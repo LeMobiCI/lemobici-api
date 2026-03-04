@@ -1,5 +1,5 @@
 import {
-  Body, Controller, HttpCode,
+  Body, Controller, Get, HttpCode,
   HttpStatus, Patch, Post, UseGuards,
 } from '@nestjs/common';
 import { RegisterDto }    from './dto/register.dto';
@@ -48,6 +48,22 @@ export class AuthController {
     return this.authService.login(loginDto);
   }
 
+  /**
+   * Get le user connecté (décodé du token JWT)
+   * GET /api/v1/auth/me
+   *
+   *  @param user - Le user connecté (injecté via le décorateur @CurrentUser())
+   *  @return - Les infos du user connecté (sans le mot de passe)
+   * 
+   * Note : Cette route doit être protégée par le JwtAuthGuard pour s'assurer que seul un utilisateur authentifié peut y accéder
+   */
+  @Get('me')
+  @UseGuards(JwtAuthGuard)
+  @HttpCode(HttpStatus.OK)
+  getProfile(@CurrentUser() user: User) {
+    return user;
+  }
+
 
   /** 
    * Déconnecter le user en invalidant son token JWT côté serveur 
@@ -69,7 +85,7 @@ export class AuthController {
 
   /**
    * Mettre à jour le mot de passe d'un user connecté
-   * POST /api/v1/auth/update-password
+   * Patch /api/v1/auth/update-password
    * 
    * @param user - Le user connecté (injecté via le décorateur @CurrentUser())
    * @param updatePasswordDto : L'ancien mot de passe et le nouveau mot de passe

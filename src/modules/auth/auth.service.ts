@@ -197,7 +197,7 @@ export class AuthService {
     // Le JwtModule est déjà configuré avec secret + expiresIn via registerAsync.
     // On appelle sign() SANS options → il utilise la config du module directement.
     const accessToken = this.jwtService.sign({ 
-      id: user.id, 
+      sub: user.id, 
       email: user.email, 
       role: user.role 
     });
