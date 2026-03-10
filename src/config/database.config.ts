@@ -11,7 +11,7 @@ export default registerAs(
     type: 'postgres',
     host:     process.env.DB_HOST     ?? 'localhost',
     port:     parseInt(process.env.DB_PORT ?? '5432', 10),
-    username: process.env.DB_USERNAME ?? 'lemobici',
+    username: process.env.DB_USER ?? 'lemobici',
     password: process.env.DB_PASSWORD ?? 'lemobici_password',
     database: process.env.DB_NAME     ?? 'lemobici_db',
 

@@ -1,6 +1,7 @@
 import {
   BadRequestException,
   ConflictException,
+  ForbiddenException,
   Injectable,
   NotFoundException,
   UnauthorizedException,
@@ -10,11 +11,13 @@ import { InjectRepository } from '@nestjs/typeorm';
 import * as bcrypt from 'bcrypt';
 import * as crypto from 'crypto';
 import { Repository } from 'typeorm';
+import { StringValue } from 'ms';
 
 import {
   IAuthResponse,
   IMessageResponse,
   BCRYPT_SALT_ROUNDS,
+  JwtPayload,
 } from '@lemobici/lemobici-shared';
 
 import { RegisterDto } from './dto/register.dto';
@@ -25,6 +28,12 @@ import { ResetPasswordDto } from './dto/reset-passord.dto';
 import { ConfigService } from '@nestjs/config';
 import { MailService } from '../mail/mail.service';
 import { UpdatePasswordDto } from './dto/update-password.dto';
+import { RedisService } from '../redis/redis.service';
+
+
+// Clé Redis pour les refresh tokens : "refresh:<userId>"
+const refreshKey = (userId: string) => `refresh:${userId}`;
+
 
 @Injectable()
 export class AuthService {
@@ -33,7 +42,8 @@ export class AuthService {
     private readonly userRepository: Repository<User>,
     private readonly jwtService: JwtService,
     private readonly configService: ConfigService,
-    private readonly mailService: MailService
+    private readonly mailService: MailService,
+    private readonly redisService: RedisService,
   ) {}
 
   // ───────── register ──────────
@@ -80,11 +90,37 @@ export class AuthService {
     return this.buildResponse(user);
   }
 
-  // ───────── logout ──────────
+  // ───────── refresh ──────────
 
-  async logout(_userId: string): Promise<IMessageResponse> {
-    // JWT stateless : la suppression du token est gérée côté client.
-    // Pour une révocation serveur → implémenter une blacklist Redis.
+  async refresh(
+    payload: JwtPayload,
+    refreshToken: string
+  ): Promise<{ accessToken: string }> {
+    // Récupérer le hash stocké dans Redis
+    const stored = await this.redisService.get(refreshKey(payload.sub));
+
+    if (!stored) {
+      throw new ForbiddenException('Session expirée, veuillez vous reconnecter');
+    }
+
+    // Comparer le token reçu avec le hash en Redis
+    const isValid = await bcrypt.compare(refreshToken, stored);
+    if (!isValid) {
+      // Token potentiellement volé — invalider toute la session
+      await this.redisService.del(refreshKey(payload.sub));
+      throw new ForbiddenException('Refresh token invalide');
+    }
+
+    // Émettre un nouvel access token
+    const accessToken = this.signAccessToken(payload.sub, payload.email, payload.role);
+
+    return { accessToken };
+  }
+
+  // ───────── logout ──────────
+  async logout(userId: string): Promise<IMessageResponse> {
+    // Invalider le refresh token en Redis
+    await this.redisService.del(refreshKey(userId));
     return { message: 'Déconnexion réussie' };
   }
 
@@ -111,7 +147,7 @@ export class AuthService {
 
   // ───────── forgotPassword ──────────
 
-  async forgotPassword(dto: ForgotPasswordDto): Promise<{ message: string }> {
+  async forgotPassword(dto: ForgotPasswordDto): Promise<IMessageResponse> {
     const user = await this.userRepository.findOne({
       where: { email: dto.email },
     });
@@ -119,8 +155,7 @@ export class AuthService {
     // Réponse identique que l'email existe ou non
     // → empêche l'énumération d'emails (user enumeration attack)
     const genericMessage = {
-      message:
-        'Si un compte existe avec cet email, vous recevrez un lien de réinitialisation.',
+      message: 'Si un compte existe avec cet email, vous recevrez un lien de réinitialisation.',
     };
 
     if (!user || !user.isActive) {
@@ -155,7 +190,7 @@ export class AuthService {
   }
 
   // ───────── resetPassword ──────────
-  async resetPassword(dto: ResetPasswordDto): Promise<{ message: string }> {
+  async resetPassword(dto: ResetPasswordDto): Promise<IMessageResponse> {
     // Hasher le token reçu pour comparer avec celui en DB
     const hashedToken = crypto
       .createHash('sha256')
@@ -193,16 +228,35 @@ export class AuthService {
 
   // ───────── Helpers ──────────
 
-  private buildResponse(user: User): IAuthResponse {
-    // Le JwtModule est déjà configuré avec secret + expiresIn via registerAsync.
-    // On appelle sign() SANS options → il utilise la config du module directement.
-    const accessToken = this.jwtService.sign({ 
-      sub: user.id, 
-      email: user.email, 
-      role: user.role 
-    });
+  private async buildResponse(user: User): Promise<IAuthResponse> {
+    const accessToken  = this.signAccessToken(user.id, user.email, user.role);
+    const refreshToken = this.signRefreshToken(user.id, user.email, user.role);
+
+    // Hasher le refresh token avant de le stocker dans Redis
+    const hashedRefresh = await bcrypt.hash(refreshToken, BCRYPT_SALT_ROUNDS);
+    await this.redisService.set(refreshKey(user.id), hashedRefresh, 7 * 24 * 60 * 60);
 
     const { password: _pwd, ...userWithoutPassword } = user;
-    return { accessToken, user: userWithoutPassword };
+    return { accessToken, refreshToken, user: userWithoutPassword };
+  }
+
+  private signAccessToken(sub: string, email: string, role: string): string {
+    return this.jwtService.sign(
+      { sub, email, role },
+      {
+        secret:    this.configService.get<string>('JWT_SECRET'),
+        expiresIn: (this.configService.get<string>('JWT_EXPIRES_IN') ?? '15m' as string) as StringValue,
+      },
+    );
+  }
+
+  private signRefreshToken(sub: string, email: string, role: string): string {
+    return this.jwtService.sign(
+      { sub, email, role },
+      {
+        secret:    this.configService.get<string>('JWT_REFRESH_SECRET'),
+        expiresIn: (this.configService.get<string>('JWT_REFRESH_EXPIRES_IN') ?? '7d') as StringValue,
+      },
+    );
   }
 }

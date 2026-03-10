@@ -12,11 +12,16 @@ import { JwtAuthGuard }   from './guards/jwt-auth.guard';
 import { RolesGuard }     from './guards/roles.guard';
 import { JwtStrategy }    from './strategies/jwt.strategy';
 import { MailModule } from '../mail/mail.module';
+import { RefreshAuthGuard } from './guards/refresh-auth.guard';
+import { RefreshStrategy } from './strategies/refresh.strategy';
+import { RedisModule } from '../redis/redis.module';
 
 @Module({
   imports: [
     TypeOrmModule.forFeature([User]),
     PassportModule.register({ defaultStrategy: 'jwt' }),
+    MailModule,
+    RedisModule,
 
     // JwtModule async : lit le secret depuis ConfigService
     JwtModule.registerAsync({
@@ -24,14 +29,31 @@ import { MailModule } from '../mail/mail.module';
       inject: [ConfigService],
       useFactory: (config: ConfigService) => ({
         secret: config.get<string>('jwt.secret'),
-        signOptions: { expiresIn: (config.get<string>('jwt.signOptions.expiresIn')) as StringValue ?? '7d' },
+        signOptions: { expiresIn: (config.get<string>('jwt.signOptions.expiresIn')) as StringValue ?? '15m' },
       }),
     }),
-    MailModule,
   ],
+
+  // Controllers : routes
   controllers: [AuthController],
-  providers:   [AuthService, JwtStrategy, JwtAuthGuard, RolesGuard],
+
+  // Providers : services, stratégies, guards
+  providers: [
+    AuthService, 
+    JwtStrategy, 
+    RefreshStrategy, 
+    JwtAuthGuard, 
+    RolesGuard, 
+    RefreshAuthGuard
+  ],
+
   // Export des guards pour utilisation dans les autres modules
-  exports:     [AuthService, JwtAuthGuard, RolesGuard, JwtModule],
+  exports: [
+    AuthService, 
+    JwtModule, 
+    JwtAuthGuard, 
+    RolesGuard, 
+    RefreshAuthGuard
+  ],
 })
 export class AuthModule {}

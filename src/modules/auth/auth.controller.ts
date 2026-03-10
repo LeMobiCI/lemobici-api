@@ -1,6 +1,6 @@
 import {
   Body, Controller, Get, HttpCode,
-  HttpStatus, Patch, Post, UseGuards,
+  HttpStatus, Patch, Post, Res, UseGuards,
 } from '@nestjs/common';
 import { RegisterDto }    from './dto/register.dto';
 import { LoginDto }       from './dto/login.dto';
@@ -11,11 +11,19 @@ import { User }           from './entities/user.entity';
 import { ForgotPasswordDto } from './dto/forgot-passord.dto';
 import { ResetPasswordDto } from './dto/reset-passord.dto';
 import { UpdatePasswordDto } from './dto/update-password.dto';
+import { Throttle, ThrottlerGuard } from '@nestjs/throttler';
+import { RefreshAuthGuard } from './guards/refresh-auth.guard';
+import { JwtPayload } from '@lemobici/lemobici-shared';
+import { CookieOptions, Response } from 'express';
+import { ConfigService } from '@nestjs/config';
 
 
 @Controller('auth')
 export class AuthController {
-  constructor(private readonly authService: AuthService) {}
+  constructor(
+    private readonly authService:   AuthService,
+    private readonly configService: ConfigService,
+  ) {}
 
   /** 
    * Inscrire un nouvel utilisateur
@@ -27,9 +35,16 @@ export class AuthController {
    * Note : Cette route n'a pas besoin de token JWT pour être accessible.
    * */
   @Post('register')
+  @UseGuards(ThrottlerGuard)
+  @Throttle({ default: { limit: 5, ttl: 60000 } })
   @HttpCode(HttpStatus.CREATED)
-  register(@Body() registerDto: RegisterDto) {
-    return this.authService.register(registerDto);
+  async register(
+    @Body() dto: RegisterDto,
+    @Res({ passthrough: true }) res: Response,
+  ) {
+    const { refreshToken, ...response } = await this.authService.register(dto);
+    res.cookie('refresh_token', refreshToken, this.cookieOptions());
+    return response;
   }
 
 
@@ -43,9 +58,34 @@ export class AuthController {
    * Note : Cette route n'a pas besoin de token JWT pour être accessible.
    * */
   @Post('login')
+  @UseGuards(ThrottlerGuard)
+  @Throttle({ default: { limit: 5, ttl: 60000 } })
   @HttpCode(HttpStatus.OK)
-  login(@Body() loginDto: LoginDto) {
-    return this.authService.login(loginDto);
+  async login(
+    @Body() dto: LoginDto,
+    @Res({ passthrough: true }) res: Response,
+  ) {
+    const { refreshToken, ...response } = await this.authService.login(dto);
+    res.cookie('refresh_token', refreshToken, this.cookieOptions());
+    return response;
+  }
+
+
+  /**
+   * Refresh le token JWT en utilisant un refresh token valide (cookie httpOnly)
+   * POST /api/v1/auth/refresh
+   * 
+   * @param user - Injecté par le RefreshAuthGuard, contient le payload du JWT et le refresh token brut
+   * @returns - les infos du user + un nouveau token JWT valide
+   *
+   */
+  @Post('refresh')
+  @UseGuards(RefreshAuthGuard)
+  @HttpCode(HttpStatus.OK)
+  refresh(
+    @CurrentUser() user: { payload: JwtPayload; refreshToken: string },
+  ) {
+    return this.authService.refresh(user.payload, user.refreshToken);
   }
 
   /**
@@ -78,7 +118,11 @@ export class AuthController {
   @Post('logout')
   @UseGuards(JwtAuthGuard)
   @HttpCode(HttpStatus.OK)
-  logout(@CurrentUser() user: User) {
+  async logout(
+    @CurrentUser() user: User,
+    @Res({ passthrough: true }) res: Response,
+  ) {
+    res.clearCookie('refresh_token', this.cookieOptions());
     return this.authService.logout(user.id);
   }
 
@@ -100,7 +144,6 @@ export class AuthController {
     @CurrentUser() user: User,
     @Body() updatePasswordDto: UpdatePasswordDto
   ) {
-    console.log('Received updatePassword request for user:', user.id);
     return this.authService.updatePassword(user.id, updatePasswordDto);
   }
 
@@ -113,6 +156,8 @@ export class AuthController {
    * @return : Un message de succès ou une erreur si le mdp ne respecte pas les règles de validation
    * */
   @Post('forgot-password')
+  @UseGuards(ThrottlerGuard)
+  @Throttle({ default: { limit: 5, ttl: 60000 } })
   @HttpCode(HttpStatus.OK)
   forgotPassword(@Body() forgotPasswordDto: ForgotPasswordDto) {
     return this.authService.forgotPassword(forgotPasswordDto);
@@ -130,5 +175,18 @@ export class AuthController {
   @HttpCode(HttpStatus.OK)
   resetPassword(@Body() resetPasswordDto: ResetPasswordDto) {
     return this.authService.resetPassword(resetPasswordDto);
+  }
+
+  // ─────────────── helpers ─────────────────
+
+  private cookieOptions(): CookieOptions {
+    const isProd = this.configService.get<string>('NODE_ENV') === 'production';
+    return {
+      httpOnly: true,
+      secure:   isProd,
+      sameSite: 'strict',
+      maxAge:   7 * 24 * 60 * 60 * 1000, // 7 jours en ms
+      path:     '/api/v1/auth',
+    };
   }
 }

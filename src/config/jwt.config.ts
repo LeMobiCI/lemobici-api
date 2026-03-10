@@ -1,17 +1,14 @@
 import { registerAs } from '@nestjs/config';
-import { JwtModuleOptions } from '@nestjs/jwt';
-import { StringValue } from 'ms';
 
 /**
- * Configuration JWT chargée depuis les variables d'environnement.
- * Utilisée dans AuthModule via JwtModule.registerAsync().
+ * Namespace 'jwt' — chargé dans AppModule.
+ * Dans JwtStrategy et JwtModule.registerAsync(), on lit JWT_SECRET
+ * directement via configService.get<string>('JWT_SECRET') car passport-jwt
+ * appelle super() de façon synchrone avant que le namespace soit résolu.
  */
-export default registerAs(
-  'jwt',
-  (): JwtModuleOptions => ({
-    secret: process.env.JWT_SECRET ?? 'lemobici_dev_secret_change_in_prod',
-    signOptions: {
-      expiresIn: (process.env.JWT_EXPIRES_IN as StringValue) ?? '7d',
-    },
-  }),
-);
+export default registerAs( 'jwt', () => ({
+  secret:           process.env.JWT_SECRET              ?? '',
+  expiresIn:        process.env.JWT_EXPIRES_IN          ?? '15m',
+  refreshSecret:    process.env.JWT_REFRESH_SECRET      ?? '',
+  refreshExpiresIn: process.env.JWT_REFRESH_EXPIRES_IN  ?? '7d',
+}));
