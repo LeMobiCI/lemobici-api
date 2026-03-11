@@ -8,6 +8,7 @@ on:
 jobs:
   test:
     uses: ./.github/workflows/test-lemobici-api.yml
+    secrets: inherit
     
   deploy:
     runs-on: ubuntu-latest
