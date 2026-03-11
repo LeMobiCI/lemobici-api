@@ -2,9 +2,6 @@ name: Unit Test Lemobici API
 
 on:
   workflow_call:
-    secrets:
-      NPM_TOKEN:
-        required: true
 
 jobs:
   test:
