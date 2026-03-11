@@ -1,0 +1,8 @@
+on:
+  pull_request:
+    branches: [main]
+
+jobs:
+  pr-test:
+    uses: ./.github/workflows/test-lemobici-api.yml
+    secrets: inherit

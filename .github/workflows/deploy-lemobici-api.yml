@@ -6,8 +6,13 @@ on:
   workflow_dispatch:
 
 jobs:
+  test:
+    uses: ./.github/workflows/test-lemobici-api.yml
+    secrets: inherit
+    
   deploy:
     runs-on: ubuntu-latest
+    needs: test
     
     steps:
       - name: Checkout code
@@ -62,6 +67,9 @@ jobs:
             mkdir -p lemobici-api
             tar xzf tmp/deploy.tar.gz -C lemobici-api
             rm -f tmp/deploy.tar.gz
+
+            # Configuration de l'env de l'API
+            cp .env.api.dev lemobici-api/.env
             
             # Build et démarrage
             docker compose -f docker-compose-dev.yml --env-file .env.dev build api
