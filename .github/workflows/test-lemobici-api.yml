@@ -31,4 +31,4 @@ jobs:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_MY_GITHUB_TOKEN }}
 
       - name: Run unit tests
-        run: npm test -- --testPathPattern="src/.*\.spec\.ts"
+        run: npm test -- --testPathPatterns="src/.*\.spec\.ts"
