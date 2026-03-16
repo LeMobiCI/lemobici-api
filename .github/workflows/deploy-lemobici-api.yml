@@ -55,8 +55,8 @@ jobs:
             cd /opt/lemobici
             
             # Arrêter le conteneur api existant
-            docker stop lemobici-api-container 2>/dev/null || true
-            docker rm -f lemobici-api-container 2>/dev/null || true
+            docker stop lemobici-api 2>/dev/null || true
+            docker rm -f lemobici-api 2>/dev/null || true
             
             # Backup du code
             if [ -d "lemobici-api" ]; then
@@ -68,15 +68,12 @@ jobs:
             tar xzf tmp/deploy.tar.gz -C lemobici-api
             rm -f tmp/deploy.tar.gz
 
-            # Configuration de l'env de l'API
-            cp .env.api.dev lemobici-api/.env
-            
             # Build et démarrage
-            docker compose -f docker-compose-dev.yml --env-file .env.dev build api
-            docker compose -f docker-compose-dev.yml --env-file .env.dev up -d api
+            docker compose build api
+            docker compose up -d api
             
             # Health check
             sleep 5
-            docker ps --filter "name=lemobici-api-container" --format "table {{.Names}}\t{{.Status}}"
+            docker ps --filter "name=lemobici-api" --format "table {{.Names}}\t{{.Status}}"
             
             echo "Deployment API finished ••• 1 ⚔️ ••• ✅"

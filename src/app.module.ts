@@ -12,10 +12,15 @@ import redisConfig from './config/redis.config';
 import { ThrottlerModule } from '@nestjs/throttler';
 import { RedisService } from './modules/redis/redis.service';
 import { RedisModule } from './modules/redis/redis.module';
+import { TerminusModule } from '@nestjs/terminus';
+import { HealthController } from './health.controller';
 
 @Module({
 
   imports: [
+    // ──────────────── Modules ────────────────
+    TerminusModule,
+
     // ──────────────── Configuration globale ────────────────
     ConfigModule.forRoot({
       isGlobal : true,
@@ -41,7 +46,7 @@ import { RedisModule } from './modules/redis/redis.module';
     AuthModule,
   ],
 
-  controllers: [AppController],
+  controllers: [AppController, HealthController],
 
   providers: [AppService, RedisService],
 })
